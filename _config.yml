@@ -1,4 +1,5 @@
 # Site settings
+name: RexK
 title: RexK's Blog
 email: myungsunrex@gmail.com
 description: "Programming Discipline"
@@ -13,4 +14,3 @@ permalink: /posts/:title
 relative_permalinks: false
 exclude:
   - google-key.p12
-

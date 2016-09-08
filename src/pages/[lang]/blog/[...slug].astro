@@ -1,0 +1,41 @@
+---
+import type { CollectionEntry } from "astro:content";
+import { getCollection } from "astro:content";
+import BlogPost from "../../../layouts/BlogPost.astro";
+import { getGrouppedBlogs, getLocalizedContent } from "../../../content/blogs";
+import { SUPPORTED_LANGUAGES } from "../../../consts";
+
+export async function getStaticPaths() {
+  const posts = await getGrouppedBlogs();
+
+  return posts.flatMap(post => {
+    return SUPPORTED_LANGUAGES.map(lang => {
+      const content = getLocalizedContent(post, lang)
+      return {
+        params: {
+          slug: content.slug,
+          lang: lang,
+        },
+        props: content,
+        lang,
+      }
+    });
+  });
+}
+
+export type Props = CollectionEntry<"blog">;
+const post = Astro.props;
+const { Content } = await post.render();
+const allPosts = await getCollection("blog");
+const posts = allPosts.filter(p => p.data.group === post.data.group)
+const links = posts.map(p => ({
+  lang: p.data.lang || 'en',
+  target: `/${p.data.lang || 'en'}/blog/${p.slug}`,
+}));
+
+---
+
+<BlogPost {...post.data} links={links} >
+  <Content />
+</BlogPost>
+

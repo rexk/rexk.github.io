@@ -2,8 +2,8 @@
   var anchorForId = function (id) {
     var anchor = document.createElement("a");
     anchor.className = "header-link";
-    anchor.href      = "#" + id;
-    anchor.innerHTML = "<i class=\"fa fa-link\"></i>";
+    anchor.href = "#" + id;
+    anchor.innerHTML = '<i class="fa fa-link"></i>';
     return anchor;
   };
 
@@ -20,7 +20,9 @@
 
   document.onreadystatechange = function () {
     if (this.readyState === "complete") {
-      var contentBlock = document.getElementsByClassName("docs")[0] || document.getElementsByClassName("news")[0];
+      var contentBlock =
+        document.getElementsByClassName("docs")[0] ||
+        document.getElementsByClassName("news")[0];
       if (!contentBlock) {
         return;
       }

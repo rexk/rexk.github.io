@@ -1,0 +1,31 @@
+---
+import BaseHead from "../components/BaseHead.astro";
+import Header from "../components/Header.astro";
+import Footer from "../components/Footer.astro";
+import { getLocalizedSite } from "../data/site";
+import type { LanguageSpecificLink } from "../components/LanguageSelect.astro";
+
+export interface Props {
+  lang: string;
+  links?: LanguageSpecificLink[];
+}
+
+const { lang, links = [] } = Astro.props;
+const site = getLocalizedSite(lang);
+---
+
+<!DOCTYPE html>
+<html lang={lang}>
+  <head>
+    <BaseHead title={site.title} description={site.description} lang={lang} />
+  </head>
+  <body>
+    <Header title={site.title} lang={lang} links={links} />
+    <main>
+      <section class="container">
+        <slot />
+      </section>
+    </main>
+    <Footer />
+  </body>
+</html>

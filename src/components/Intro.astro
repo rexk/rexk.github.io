@@ -1,0 +1,15 @@
+---
+import MainLayout from "../layouts/MainLayout.astro";
+
+export interface Props {
+  lang: string;
+}
+
+const { lang } = Astro.props;
+---
+
+<MainLayout lang={lang}>
+  <article>
+    <img width={360} height={360} src="/favicon.png" />
+  </article>
+</MainLayout>

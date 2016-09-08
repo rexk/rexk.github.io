@@ -21,13 +21,12 @@
     </ul>
     <h4>Other News</h4>
     <ul>
-        {% for post in site.posts %}
-        {% unless post.categories contains 'release' %}
-        <li class="{% if page.title == post.title %}current{% endif %}">
-          <a href="{{ post.url }}">{{ post.title }}</a>
-        </li>
-        {% endunless %}
-        {% endfor %}
+      {% for post in site.posts %} {% unless post.categories contains 'release'
+      %}
+      <li class="{% if page.title == post.title %}current{% endif %}">
+        <a href="{{ post.url }}">{{ post.title }}</a>
+      </li>
+      {% endunless %} {% endfor %}
     </ul>
   </aside>
 </div>

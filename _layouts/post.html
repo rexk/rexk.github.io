@@ -2,17 +2,21 @@
 layout: default
 comments: true
 ---
+
 <section class="post">
-    <div class="grid">
-        <div class="unit whole">
-            <h1>{{ page.title }}</h1>
-            <p class="meta">{{ page.date | date: "%b %-d, %Y" }}{% if page.author %} • {{ page.author }}{% endif %}{% if page.meta %} • {{ page.meta }}{% endif %}</p>
-        </div>
-        <div class="unit whole">
-            <!-- <article class="post-content">{{content}}</article> -->
-            <article>{{ content }}</article>
-        </div>
+  <div class="grid">
+    <div class="unit whole">
+      <h1>{{ page.title }}</h1>
+      <p class="meta">
+        {{ page.date | date: "%b %-d, %Y" }}{% if page.author %} • {{
+        page.author }}{% endif %}{% if page.meta %} • {{ page.meta }}{% endif %}
+      </p>
     </div>
-    <div class="clear"></div>
+    <div class="unit whole">
+      <!-- <article class="post-content">{{content}}</article> -->
+      <article>{{ content }}</article>
+    </div>
+  </div>
+  <div class="clear"></div>
 </section>
 {% include comments.html %}

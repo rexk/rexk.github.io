@@ -1,0 +1,35 @@
+---
+import MainLayout from "../layouts/MainLayout.astro";
+
+export interface Props {
+  lang: string;
+}
+
+const { lang } = Astro.props;
+const contents: { [key: string]: string[] } = {
+    en: [
+        "Rex codes",
+        "Rex builds",
+        "Rex plays video games",
+        "Rex hates typing",
+        "Rust, Rust, Rust, Rust..."
+    ],
+    ko: [
+        "코딩",
+        "개발",
+        "게임",
+        "키보드 치는게 싫다",
+        "Rust, Rust, Rust, Rust..."
+    ]
+} 
+
+const items = contents[lang] || contents.en;
+---
+
+<MainLayout lang={lang}>
+  <article>
+    <ul>
+        {items.map(item => <li>{item}</li>)}
+    </ul>
+  </article>
+</MainLayout>

@@ -1,0 +1,124 @@
+---
+import type { CollectionEntry } from "astro:content";
+import { getCollection } from "astro:content";
+
+import BaseHead from "../../../components/BaseHead.astro";
+import Header from "../../../components/Header.astro";
+import Footer from "../../../components/Footer.astro";
+import { KNOWN_LANGUAGES, SUPPORTED_LANGUAGES } from "../../../consts";
+import { getLocalizedSite } from "../../../data/site";
+import FormattedDate from "../../../components/FormattedDate.astro";
+
+type Blog = CollectionEntry<"blog">;
+
+export async function getStaticPaths() {
+  function Params(lang: string) {
+    return {
+      params: {
+        lang,
+      },
+    };
+  }
+
+  return SUPPORTED_LANGUAGES.map(Params);
+}
+
+const { lang } = Astro.params;
+
+const site = getLocalizedSite(lang);
+
+interface LocalizedContents {
+  en: Blog;
+  others: { [lang: string]: Blog };
+}
+
+const groupped = new Map<string, LocalizedContents>();
+const allPosts = await getCollection("blog");
+
+// first collect all contents - which is english
+for (const post of allPosts) {
+  const group = post.data.group;
+  const lang = post.data.lang || "en";
+  if (lang !== "en") {
+    continue;
+  }
+
+  groupped.set(group, {
+    en: post,
+    others: {},
+  });
+}
+
+for (const post of allPosts) {
+  const group = post.data.group;
+  const lang = post.data.lang || "en";
+  if (lang === "en") {
+    continue;
+  }
+
+  const content = groupped.get(group);
+  if (!content) {
+    continue;
+  }
+
+  content.others[lang] = post;
+}
+
+function getLocalizedContent(contents: LocalizedContents): Blog {
+  if (lang === "en") {
+    return contents.en;
+  }
+
+  return (lang && contents.others[lang]) || contents.en;
+}
+
+// then add extra contents for other languges
+const posts = Array.from(groupped.values())
+  .sort((a, b) => a.en.data.pubDate.valueOf() - b.en.data.pubDate.valueOf())
+  .map(getLocalizedContent);
+---
+
+<!DOCTYPE html>
+<html lang={lang}>
+  <head>
+    <BaseHead title={site.title} description={site.description} />
+    <style>
+      ul {
+        list-style-type: none;
+        padding: unset;
+      }
+      ul li {
+        display: flex;
+      }
+      ul li :global(time) {
+        flex: 0 0 10em;
+        font-style: italic;
+        color: #595959;
+      }
+      ul li a:visited {
+        color: #8e32dc;
+      }
+    </style>
+  </head>
+  <body>
+    <Header title={site.title} lang={lang} />
+    <main>
+      <section class="container">
+        <ul>
+          {
+            posts.map((post) => (
+              <li>
+                <FormattedDate
+                  date={post.data.pubDate}
+                  locale={lang && KNOWN_LANGUAGES[lang]}
+                />
+                <a href={`/${lang}/blog/${post.slug}/`}>{post.data.title}</a>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+    </main>
+    <Footer />
+  </body>
+</html>

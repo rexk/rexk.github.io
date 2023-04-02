@@ -1,0 +1,45 @@
+---
+import HeaderLink from "./HeaderLink.astro";
+import LanguageSelect, { LanguageSpecificLink } from "./LanguageSelect.astro";
+
+export interface Props {
+  title: string;
+  lang?: string | undefined;
+  links?: LanguageSpecificLink[],
+}
+
+const { title, lang = "en", links = [] } = Astro.props;
+---
+
+<header>
+  <section class="header-section">
+    <h2 class="h2-title">
+      {title}
+    </h2>
+    <div class="lang-select-holder">
+      <LanguageSelect lang={lang} links={links} />
+    </div>
+  </section>
+  <nav>
+    <HeaderLink href={`/${lang}`}>Home</HeaderLink>
+    <HeaderLink href={`/${lang}/blog`}>Blog</HeaderLink>
+    <HeaderLink href={`/${lang}/about`}>About</HeaderLink>
+    <HeaderLink href="https://github.com/rexk/rexk.github.io" target="_blank">
+      GitHub
+    </HeaderLink>
+  </nav>
+</header>
+<style>
+  .header-section {
+    display: flex;
+  }
+
+  .h2-title {
+    flex: 1;
+  }
+
+  .lang-select-holder {
+    flex: 1;
+    max-width: 8em;
+  }
+</style>

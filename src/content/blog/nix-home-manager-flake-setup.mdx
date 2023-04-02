@@ -1,0 +1,310 @@
+---
+group: "nix-and-home-manager-setup"
+title: "Nix and Home manager setup"
+description: "Getting started with nix and home manager"
+pubDate: "2023-03-25"
+heroImage: "https://repository-images.githubusercontent.com/3386088/c9347c80-7b49-11e9-972e-03413da7be7a"
+tags: ["nix", "home-manager", "flake"]
+draft: true
+---
+
+## Goal
+
+In this post, we will set up nix and home-manager configuration that can be used in any developement machine.
+At the end, I would like to achieve following goals:
+
+1. Nix and Home Manager setup that can be easily trasnferred into different machines.
+2. Replace 99% of my usual `homebrew` or `apt` usage with home manager.
+
+For those of you that are impatient, a full snippets can be found at https://github.com/rexk/dotfiles/tree/nix-flake-install-stage-01
+
+
+## Installing Nix
+
+Nix's official installer is more then enough to get started.
+
+https://nixos.org/download.html#download-nix
+
+I won't go too much detail on each installation options. I chose its recommended installation instructions.
+
+## Setting up dotfiles git repository
+
+In order for the setup to be (somewhat) universal, I need way to share my configurations between different machines.
+For that, we are going to track and share dotfiles with git.
+
+There are numerous articles explaning on how we can achieve this. My setup is particularly inspried by two articles:
+
+* https://drewdevault.com/2019/12/30/dotfiles.html
+* https://www.atlassian.com/git/tutorials/dotfiles
+
+In summary, our dotfiles git repository will have following chracterestics:
+
+1. All files will be ignored with .gitignore to prevent accidental commit on sensitive information
+2. Git directory will be placed different from its work tree. This prevents nix's flake honoring gitignore file.
+
+Detailed instructions how how to set up this dotfiles repository will be convered on a different post.
+
+For now, consider that we are going to work on `$HOME/.config` directory
+
+Before we set up anything add following file to the `$HOME/.config` directory
+
+```sh
+cat <<EOF>$HOME/.config/.gitignore
+*
+!.gitignore
+
+EOF
+```
+
+## Installing Nix-Darwin
+
+<section class="nes-container with-title">
+    <p class="title">WARNING</p>
+    <span class="nes-text is-warning">This section is for OSX users only</span>
+</section>
+
+While you don't have to, it is good idea to install nix-darwin, if you are using mac machine.
+We will go over nix-darwin setup using flake, in an another post.
+
+## Installing Home Manager with flake
+
+If we follow instructions from the official home manager's manual, we end up with following flake file.
+
+```nix
+# flake.nix
+{
+  description = "Home Manager configuration of Jane Doe";
+
+  inputs = {
+    # Specify the source of Home Manager and Nixpkgs.
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-22.11";
+    home-manager = {
+      url = "github:nix-community/home-manager/release-22.11";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
+
+  outputs = { nixpkgs, home-manager, ... }:
+    let
+      system = "x86_64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
+    in {
+      homeConfigurations.jdoe = home-manager.lib.homeManagerConfiguration {
+        inherit pkgs;
+
+        # Specify your home configuration modules here, for example,
+        # the path to your home.nix.
+        modules = [
+          ./home.nix
+        ];
+
+        # Optionally use extraSpecialArgs
+        # to pass through arguments to home.nix
+      };
+    };
+}
+
+# home.nix
+{
+  # Set following two fields in your home.user.nix properly
+  home.username = "jdoe";
+  home.homeDirectory = "/home/jdoe";
+  home.stateVersion = "22.11";
+}
+```
+
+The installation instructs to update user specific information on home.nix and flake.nix. However, this 
+isn't enough for my use case. I need to be able to use same flake file on my each dev machines. 
+Unfortunately, I have different user names for each  dev machines. 
+Not only I have different user name, I have different system configurations for each machine.
+
+For the flake.nix and home.nix to be used on each of my machine, I need to abstract user specific
+information out of flake.nix, and home.nix.
+
+For that, I've made following changes.
+
+```diff
+ {
+-  description = "Home Manager configuration of Jane Doe";
++  description = "Home Manager configuration";
+ 
+   inputs = {
+     # Specify the source of Home Manager and Nixpkgs.
+-    nixpkgs.url = "github:nixos/nixpkgs/nixos-22.11";
++    nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.11";
++    nixpkgs-unstable.url = "github:NixOs/nixpkgs/nixos-unstable";
+     home-manager = {
+       url = "github:nix-community/home-manager/release-22.11";
+       inputs.nixpkgs.follows = "nixpkgs";
+     };
++    flake-utils.url = "github:numtide/flake-utils";
+   };
+ 
+-  outputs = { nixpkgs, home-manager, ... }:
++  outputs = { nixpkgs, flake-utils, home-manager, nixpkgs-unstable, ... }:
+     let
+-      system = "x86_64-linux";
+-      pkgs = nixpkgs.legacyPackages.${system};
+-    in {
+-      homeConfigurations.jdoe = home-manager.lib.homeManagerConfiguration {
+-        inherit pkgs;
++      utils = flake-utils;
++      user = import ./user.nix;
++    in
++    utils.lib.eachDefaultSystem (system:
++      let
++        stable-pkgs = nixpkgs.legacyPackages.${system};
++        unstable-pkgs = nixpkgs-unstable.legacyPackages.${system};
++        pkgs = stable-pkgs // {
++          # provides alias for all ustable pkgs
++          unstable = unstable-pkgs;
+ 
+-        # Specify your home configuration modules here, for example,
+-        # the path to your home.nix.
+-        modules = [
+-          ./home.nix
+-        ];
++          starship = unstable-pkgs.starship;
++          git = unstable-pkgs.git;
++        };
++      in
++      {
++        formatter = pkgs.nixpkgs-fmt;
+ 
+-        # Optionally use extraSpecialArgs
+-        # to pass through arguments to home.nix
+-      };
+-    };
++        packages = {
++          homeConfigurations.${user.name} = home-manager.lib.homeManagerConfiguration {
++            inherit pkgs;
++
++            # Specify your home configuration modules here, for example,
++            # the path to your home.nix.
++            modules = [
++              ./home.nix
++            ];
++
++            # Optionally use extraSpecialArgs
++            # to pass through arguments to home.nix
++            extraSpecialArgs = {
++              inherit pkgs;
++            };
++          };
++        };
++      });
+ }
+```
+
+```diff
++let
++  user = import ./user.nix;
+ {
+-  home.username = "jdoe";
+-  home.homeDirectory = "/home/jdoe";
++  home.username = user.name;
++  home.homeDirectory = user.homeDir;
+   home.stateVersion = "22.11";
+ }
+
+```
+
+where `user.nix` is rendered output of `user.nix.tpl`
+
+```nix
+{
+  name = "$USER";
+  hostname = "$(hostname)";
+  homeDir = "$HOME";
+}
+```
+
+Above can be rendered with following script:
+
+```sh
+#!/usr/bin/env sh
+
+#-------------------------------------------------
+# render-user-nix
+#-------------------------------------------------
+# render user specific nix files for home-manager
+# If the current environment is darwin, 
+# we will also render configurations for nix-darwin (osx)
+
+render_user_nix() {
+  local file="$1"
+  local dest="$2"
+  if [ -f "$file" ];
+  then
+    local tmp="/tmp/$(basename $1)"
+    # substitutes sh experssions
+   (echo "cat <<EOF"; cat $file; echo EOF) | sh > $tmp
+    cp $tmp $dest
+  fi
+}
+
+CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}
+
+render_user_nix $CONFIG_DIR/home-manager/user.nix.tpl $CONFIG_DIR/home-manager/user.nix
+
+case "$(uname -s)" in
+  Darwin)
+    render_user_nix $CONFIG_DIR/nix-darwin/user.nix.tpl $CONFIG_DIR/nix-darwin/user.nix
+    ;;
+esac
+
+# no need to keep the function
+unset render_user_nix
+```
+
+Since I need this script for my other machines, I am going to place this script under `~/.config/bin` folder.
+
+Additionally, I've pulled https://github.com/numtide/flake-utils into my flake. This lets me define flake configuration
+per each of systems that I use.
+
+
+## Applying home configuration
+
+Since we are using flake installation, usual `home-manager` command is not available in our path.
+We need to explicitly run `nix run` command.
+
+If my user name is jdoe, the command will look like the following:
+
+
+```sh
+nix run /home/jdoe/home-manager#homeConfigurations.jdoe.activationPackage
+```
+
+However, I want to make these configurations work on any machine, so let's provide another script for 
+home-manager activation
+
+
+```sh
+#!/usr/bin/env sh
+
+set -e;
+
+#-------------------------------------------------
+# hms
+#-------------------------------------------------
+# aliasing "home-manager switch" command for flake
+CONFIG_DIR=${XDG_CONFIG_HOME:=$HOME/.config}
+/nix/var/nix/profiles/default/bin/nix \
+  --extra-experimental-features "nix-command flakes" \
+  run $CONFIG_DIR/home-manager#homeConfigurations.\"$USER\".activationPackage
+```
+
+
+## Final form
+
+```sh
+├── bin
+│  ├── render-user-nix
+│  └── hms 
+└── home-manager
+   ├── flake.nix
+   ├── flake.lock
+   ├── home.nix
+   ├── user.nix <-- generated by render-user-nix. Not checked in
+   └── user.nix.tpl
+```

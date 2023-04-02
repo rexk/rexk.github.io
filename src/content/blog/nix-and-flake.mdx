@@ -1,0 +1,166 @@
+---
+group: "nix-home-manage-and-flake"
+title: "Nix, Home Manager, and Flake"
+description: "Nix, Home Manager, and Flake"
+pubDate: "2023-04-01"
+heroImage: "https://repository-images.githubusercontent.com/3386088/c9347c80-7b49-11e9-972e-03413da7be7a"
+tags: ["nix", "home-manager", "flake"]
+draft: false
+---
+
+## Motivation
+
+As a developer, (unless you are very fortunate) we work with many different languages, frameworks and tools.
+Even if one is working on same framework with same language, you are bound to work with different versions of 
+the language or a framework (or both) depending on a project you are assigned to. This creates interesting 
+challenges on identifying and configuring a right tool for a right job.
+
+There are many tools that could solve the problem, but I eventaully settled on `nix`, `flake`, `home-manager`.
+and dotfiles as git repository.
+
+I am going to go over alternative tools, and explain why I settled with nix.
+
+## Other tools
+
+### homebrew or os specific package manager.
+
+In OSX, package managers like homebrew, apt, apk, yum, and others that 
+come with operating systems are really convenient when setting up one 
+version of software that applies to the entire system. However, I
+develop and manage programs that are distributed across hundreds of git repositories. 
+These programs are not created overnight but accumulate over time in each repository.
+
+Therefore, older programs that I made may not work with different
+versions of languages and build tools. Especially now that new versions
+of languages like Java or NodeJS are released every six months,
+version diversity is increasing.
+
+Also, because the programming languages and their versions used are different,
+even though each repository has instructions for installing and setting up
+development tools in their README.md files, it is common for them to 
+not work properly when I try to run them again after a few years.
+
+
+### pyenv, nvm, jenv
+
+I started using a program version management tool because I couldn't keep up with all the package management programs. Initially, I started with environment configuration tools for specific languages, such as pyenv for Python, nvm for Node.js, and jenv for Java. However, as I manage too many repositories, these configuration tools also became harder to use over time as they are updated, and their usage and provided language versions change.
+
+Furthermore, each program has different installation methods and bash configuration methods, so teaching all my colleagues the installation process was very time-consuming.
+
+While searching for a tool to solve all these problems with one program, I came across asdf-vm.
+
+### What about Docker? 
+
+When developing a software, I highly value fast feedback between my code and the result I produce.
+For that, I rely on my IDE or editor's fast response on various things (syntax highlighting, syntax error, type error, debugger, ...)
+
+Hosting my code in docker and piping into my local development setup always has been sub-optimal, thus
+docker was never my consideration.
+
+<div class="nes-container with-title">
+<p class="title">Problems</p>
+* Difficult to maintain documentations for all tools
+  * Install instruction for each tool
+  * Environment set up instructions (bash, zsh, fish... etc)
+  * Only limited
+* Difficult to maintain plugin versions synced for all developers
+  * Creating work-my-machine-but-not-yours situation
+</div>
+
+## So Nix can solve all of the problems?
+
+Well, not 100%, but very close to it. I am happy with it at the moment
+
+### What is Nix?
+
+Nix is a package manager and a language used to manage software dependencies and builds.
+It's different from other package managers because it uses a purely functional approach,
+which means that packages are isolated and have their own dependencies. This makes it 
+easy to create consistent and reproducible software environments. 
+
+Nix also has a powerful language for describing software builds, which allows developers 
+to specify exact versions and configurations of dependencies. Nix is commonly used in 
+research and scientific computing to ensure that experiments are reproducible, and 
+in production environments to maintain consistent and reliable software versions. 
+
+Overall, Nix is a useful tool for managing software dependencies and builds with 
+a focus on reproducibility and maintainability.
+
+For more detail information, checkout the official website. https://nixos.org/
+
+### So why use flake?
+
+Nix Flake is a recent addition to the Nix package manager that aims to simplify and 
+streamline the management of Nix packages and configurations. It allows developers 
+to define all their dependencies, configurations, and build processes in a single file 
+called a "flake," which can be easily version-controlled and shared across different 
+projects.
+
+Nix's flake always comes with set of two files at minimum. `flake.nix` and `flake.lock` file.
+`flake.nix`'s content includes declaration of inputs and outputs. 
+
+```nix
+{
+  description = "Home Manager for Nix";
+
+  inputs.nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+  inputs.utils.url = "github:numtide/flake-utils";
+
+  outputs = { self, nixpkgs, utils, ... }:
+}
+```
+
+```json
+{
+  "nodes": {
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1677932085,
+        "narHash": "sha256-+AB4dYllWig8iO6vAiGGYl0NEgmMgGHpy9gzWJ3322g=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "3c5319ad3aa51551182ac82ea17ab1c6b0f0df89",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "nixpkgs": "nixpkgs",
+        "utils": "utils"
+      }
+    },
+    "utils": {
+      "locked": {
+        "lastModified": 1676283394,
+        "narHash": "sha256-XX2f9c3iySLCw54rJ/CZs+ZK6IQy7GXNY4nSOyu2QG4=",
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "rev": "3db36a8b464d0c4532ba1c7dda728f4576d6d073",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "flake-utils",
+        "type": "github"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
+```
+
+Above two files are from https://github.com/nix-community/home-manager
+
+Just like `package-lock.json`, flake commits snapshot of inputs. This can eliminate most of our 
+work-on-my-machine problem.
+
+## So now what?
+
+On the next post, I will go over the basic set up, then expand the set up over to be shared with others.

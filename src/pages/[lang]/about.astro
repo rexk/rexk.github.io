@@ -1,0 +1,20 @@
+---
+import About from "../../components/About.astro";
+import { SUPPORTED_LANGUAGES } from "../../consts";
+
+export async function getStaticPaths() {
+  function Params(lang: string) {
+    return {
+      params: {
+        lang,
+      },
+    };
+  }
+
+  return SUPPORTED_LANGUAGES.map(Params);
+}
+
+const { lang } = Astro.params;
+---
+
+{lang && <About lang={lang} />}

@@ -1,0 +1,104 @@
+---
+import type { CollectionEntry } from "astro:content";
+import { getCollection } from "astro:content";
+
+import BaseHead from "./BaseHead.astro";
+import Header from "./Header.astro";
+import Footer from "./Footer.astro";
+import FormattedDate from "./FormattedDate.astro";
+
+interface LocalizedContents {
+  en: CollectionEntry<"blog">;
+  others: { [lang: string]: CollectionEntry<"blog"> };
+}
+
+const groupped = new Map<string, LocalizedContents>();
+const allPosts = await getCollection("blog");
+
+// first collect all contents - which is english
+for (const post of allPosts) {
+  const group = post.data.group;
+  const lang = post.data.lang || "en";
+  if (lang !== "en") {
+    continue;
+  }
+
+  groupped.set(group, {
+    en: post,
+    others: {},
+  });
+}
+
+for (const post of allPosts) {
+  const group = post.data.group;
+  const lang = post.data.lang || "en";
+  if (lang === "en") {
+    continue;
+  }
+
+  const content = groupped.get(group);
+  if (!content) {
+    continue;
+  }
+
+  content.others[lang] = post;
+}
+
+// then add extra contents for other languges
+const posts = Array.from(groupped.values())
+  .sort((a, b) => a.en.data.pubDate.valueOf() - b.en.data.pubDate.valueOf())
+  .map((content) => ({
+    ...content.en,
+    languages: Object.keys(content.others),
+  }));
+
+export interface Props {
+  title: string;
+  description: string;
+  lang?: string;
+}
+
+const { title, description, lang } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang={lang}>
+  <head>
+    <BaseHead title={title} description={description} />
+    <style>
+      ul {
+        list-style-type: none;
+        padding: unset;
+      }
+      ul li {
+        display: flex;
+      }
+      ul li :global(time) {
+        flex: 0 0 8em;
+        font-style: italic;
+        color: #595959;
+      }
+      ul li a:visited {
+        color: #8e32dc;
+      }
+    </style>
+  </head>
+  <body>
+    <Header title="Blogs" lang={lang} />
+    <main>
+      <section class="container">
+        <ul>
+          {
+            posts.map((post) => (
+              <li>
+                <FormattedDate date={post.data.pubDate} />
+                <a href={`/blog/${post.slug}/`}>{post.data.title}</a>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+    </main>
+    <Footer />
+  </body>
+</html>

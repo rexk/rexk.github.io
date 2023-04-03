@@ -63,7 +63,7 @@ links.forEach((link) => {
       const trimedPathname = pathname.replace(/\/$/g, '');
       const size = trimedPathname.split("/").filter((s) => s).length;
       if (size === 1) {
-        if (langSet.has(pathname.replace("/", ""))) {
+        if (langSet.has(trimedPathname.replace("/", ""))) {
           window.location.href = `/${value}`;
         } else {
           window.location.href = `/${value}${pathname}`;

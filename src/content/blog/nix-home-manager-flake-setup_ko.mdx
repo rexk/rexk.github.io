@@ -1,53 +1,48 @@
 ---
 group: "nix-and-home-manager-setup"
-title: "Nix and Home manager setup"
-description: "Getting started with nix and home manager"
+title: "Nix와 home-manager 설치"
+description: "Nix와 home-manager 설치 및 설정"
 pubDate: "2023-04-02"
 heroImage: "https://repository-images.githubusercontent.com/3386088/c9347c80-7b49-11e9-972e-03413da7be7a"
 tags: ["nix", "home-manager", "flake"]
-lang: en
+lang: ko
 draft: false
 ---
 
-## Goal
+## 목표
 
-In this post, we will set up nix and home-manager configuration that can be used in any developement machine.
-At the end, I would like to achieve following goals:
+이 게시물에서는 어떤 개발 환경이든 사용할 수 있는 Nix와 Home Manager 구성을 설정할 것입니다.
+최종적으로 다음과 같은 목표를 달성하고자 합니다:
 
-1. Nix and Home Manager setup that can be easily trasnferred into different machines.
-2. Replace 99% of my usual `homebrew` or `apt` usage with home manager.
+1. 다른 컴으로 쉽게 이전할 수 있는 Nix와 Home Manager 설정 구성.
+2. homebrew 또는 apt 사용의 99%를 Home Manager로 대체.
 
-For those of you that are impatient, a full snippets can be found at https://github.com/rexk/dotfiles/tree/nix-flake-install-stage-01
+조급한 분들을 위해 전체 코드 스니펫은 https://github.com/rexk/dotfiles/tree/nix-flake-install-stage-01에서 확인하실 수 있습니다.
 
 
-## Installing Nix
-
-Nix's official installer is more then enough to get started.
+## Nix 인스톨
 
 https://nixos.org/download.html#download-nix
 
-I won't go too much detail on each installation options. I chose its recommended installation instructions.
+각 설치 옵션에 대해서는 자세히 설명하지 않겠습니다. 저는 권장 설치 지침을 선택했습니다.
 
-## Setting up dotfiles git repository
+## dotfile git 저장소 설정
 
-In order for the setup to be (somewhat) universal, I need way to share my configurations between different machines.
-For that, we are going to track and share dotfiles with git.
+설치가 (다소) 일반화되도록 하려면 서로 다른 기계 간에 구성을 공유하는 방법이 필요합니다.
+이를 위해 git으로 도트파일을 추적 및 공유할 것입니다.
 
-There are numerous articles explaning on how we can achieve this. My setup is particularly inspried by two articles:
+이를 달성하는 다양한 기사가 있습니다. 제 설정은 특히 두 가지 기사에서 영감을 받았습니다:
 
-* https://drewdevault.com/2019/12/30/dotfiles.html
-* https://www.atlassian.com/git/tutorials/dotfiles
+https://drewdevault.com/2019/12/30/dotfiles.html
+https://www.atlassian.com/git/tutorials/dotfiles
+요약하면, 저희 도트파일 git 저장소는 다음과 같은 특징을 가집니다:
 
-In summary, our dotfiles git repository will have following chracterestics:
+1. 모든 파일은 .gitignore로 민감한 정보를 실수로 커밋하는 것을 방지하기 위해 무시됩니다.
+2. Git 디렉토리는 작업 트리와 다른 위치에 배치됩니다. 이는 nix의 flake가 gitignore 파일을 존중하지 않도록 합니다. 이 도트파일 저장소를 설정하는 자세한 지침은 다른 게시물에서 다룰 것입니다.
 
-1. All files will be ignored with .gitignore to prevent accidental commit on sensitive information
-2. Git directory will be placed different from its work tree. This prevents nix's flake honoring gitignore file.
+지금은 $HOME/.config 디렉토리에서 작업할 것으로 생각해주세요.
 
-Detailed instructions how how to set up this dotfiles repository will be convered on a different post.
-
-For now, consider that we are going to work on `$HOME/.config` directory
-
-Before we set up anything add following file to the `$HOME/.config` directory
+아래 파일을 $HOME/.config 디렉토리에 추가하기 전에 작성해 주세요.
 
 ```sh
 cat <<EOF>$HOME/.config/.gitignore
@@ -57,14 +52,16 @@ cat <<EOF>$HOME/.config/.gitignore
 EOF
 ```
 
-## Installing Nix-Darwin
+## nix-darwin 설치
 
-While you don't have to, it is good idea to install nix-darwin, if you are using a mac.
-We will go over nix-darwin setup using flake, in an another post.
+현재 맥을 사용하고 계시면, nix-darwin도 같이 설치하면 좋기는 합니다.
+다만 필수 요소는 아니라서, 다른 포스트에서 nix-darwin과 flake설정을 다뤄 볼까 합니다. 일단은
+홈 매니저에 집중을 해봅시다.
 
-## Installing Home Manager with flake
 
-If we follow instructions from the official home manager's manual, we end up with following flake file.
+## Home Manager를 flake기반으로 설치
+
+Home Manager의 공식 설치 문서를 따라하면, 아래와 같은 flake.nix파일을 생성하게 됩니다.
 
 ```nix
 # flake.nix
@@ -102,22 +99,21 @@ If we follow instructions from the official home manager's manual, we end up wit
 
 # home.nix
 {
-  # Set following two fields in your home.user.nix properly
+  # 아래 필드들을 본인 컴 상황에 맡게 설정해야 합니다.
   home.username = "jdoe";
   home.homeDirectory = "/home/jdoe";
   home.stateVersion = "22.11";
 }
 ```
 
-The installation instructs to update user specific information on home.nix and flake.nix. However, this 
-isn't enough for our use case. We need to be able to use same flake file on our each dev machines. 
-Unfortunately, You might have different user names for each  dev machines, like I do.
-Not only I have different user name, I have different system configurations for each machine.
+설치 지침은 home.nix와 flake.nix에서 사용자별 정보를 업데이트하도록 지시하지만,
+제 사용 사례에는 충분하지 않습니다. 제 각 개발 환경에서 동일한 flake 파일을 사용할 수 있어야합니다.
+그러나 저는 각 개발 환경마다 다른 사용자 이름을 가지고 있습니다.
 
-For the flake.nix and home.nix to be used on each of my machine, I need to abstract user specific
-information out of flake.nix, and home.nix.
+나의 각 컴에서 flake.nix와 home.nix를 사용하려면, 사용자별 정보를 flake.nix와 home.nix에서 추상화해야합니다.
 
-For that, I've made following changes.
+그래서 다음과 같은 변경을 만들었습니다.
+
 
 ```diff
  {
@@ -205,7 +201,7 @@ For that, I've made following changes.
 
 ```
 
-where `user.nix` is rendered output of `user.nix.tpl`
+`user.nix` 파일은 `user.nix.tpl` 파일로 부터 렌더링을 합니다.
 
 ```nix
 # user.nix.tpl
@@ -216,7 +212,7 @@ where `user.nix` is rendered output of `user.nix.tpl`
 }
 ```
 
-Above can be rendered with following script:
+위 파일은 아래 쉘 스크립트를 통해서 렌더링을 하게 됩니다.
 
 ```sh
 #!/usr/bin/env sh
@@ -253,14 +249,11 @@ esac
 # no need to keep the function
 unset render_user_nix
 ```
+다른 기계에서도 이 스크립트가 필요하기 때문에, 이 스크립트를 ~/.config/bin 폴더에 위치시킬 것입니다.
 
-Since I need this script for my other machines, I am going to place this script under `~/.config/bin` folder.
+또한, https://github.com/numtide/flake-utils를 내 flake에 가져왔습니다. 이를 통해 각각의 사용하는 시스템마다 flake 구성을 정의할 수 있습니다.
 
-Additionally, I've pulled https://github.com/numtide/flake-utils into my flake. This lets me define flake configuration
-per each of systems that I use.
-
-
-## Applying home configuration
+## home manager 설정 적용 
 
 Since we are using flake installation, usual `home-manager` command is not available in our path.
 We need to explicitly run `nix run` command.
@@ -272,8 +265,8 @@ If my user name is jdoe, the command will look like the following:
 nix run /home/jdoe/home-manager#homeConfigurations.jdoe.activationPackage
 ```
 
-However, I want to make these configurations work on any machine, so let's provide another script for 
-home-manager activation
+그러나 이러한 구성을 모든 기계에서 작동하도록 만들고 싶으므로, home-manager 활성화를 위한
+다른 스크립트를 제공해 봅시다.
 
 
 ```sh
@@ -292,7 +285,7 @@ CONFIG_DIR=${XDG_CONFIG_HOME:=$HOME/.config}
 ```
 
 
-## Final file tree
+## 최종 파일 트리
 
 ```sh
 ├── bin
@@ -306,9 +299,9 @@ CONFIG_DIR=${XDG_CONFIG_HOME:=$HOME/.config}
    └── user.nix.tpl
 ```
 
-# References
+## 참조
 
-* Nix Install:https://nixos.org/download.html
-* Home Manager Manual: https://rycee.gitlab.io/home-manager/
+* Nix 설치: https://nixos.org/download.html
+* Home Manager 매뉴얼: https://rycee.gitlab.io/home-manager/
 * https://drewdevault.com/2019/12/30/dotfiles.html
 * https://www.atlassian.com/git/tutorials/dotfiles

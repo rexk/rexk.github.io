@@ -36,7 +36,7 @@ const site = getLocalizedSite(lang);
       <article class="container mx-auto max-w-screen-lg px-3 py-6">
         {heroImage && <img class="h-full w-full rounded-lg object-cover object-center" src={heroImage} alt="" />}
         <h1 class="title">{title}</h1>
-        { pubDate && <FormattedDate date={pubDate} /> }
+        { pubDate && <FormattedDate date={pubDate} locale={KNOWN_LANGUAGES[lang]} /> }
         {
           updatedDate && (
             <div class="last-updated-on">

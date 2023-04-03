@@ -32,18 +32,18 @@ jobs:
           node-version: 18
           cache: pnpm
           cache-dependency-path: "./pnpm-lock.yaml"
-    - name: Install
-      shell: "bash"
-      run: |
-        pnpm install
-    - name: Build
-      shell: "bash"
-      run: |
-        pnpm run build
-    - name: Upload Pages Artifact
-      uses: actions/upload-pages-artifact@v1
-      with:
-        path: "./dist/"
+      - name: Install
+        shell: "bash"
+        run: |
+          pnpm install
+      - name: Build
+        shell: "bash"
+        run: |
+          pnpm run build
+      - name: Upload Pages Artifact
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: "./dist/"
 
   deploy:
     needs: build

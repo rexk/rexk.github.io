@@ -11,12 +11,13 @@ export interface Props {
 const { title, lang = "en", links = [] } = Astro.props;
 ---
 
-<header>
-  <section class="header-section">
-    <h2 class="h2-title">
+<header class="mx-auto max-w-screen-lg px-3 py-6">
+  <section class="header-section flex flex-col gap-y-3 sm:flex-row sm:items-center sm:justify-between"
+  >
+    <h2 class="h2-title pure-u-1-12">
       {title}
     </h2>
-    <div class="lang-select-holder">
+    <div class="lang-select-holder pure-u-2-3">
       <LanguageSelect lang={lang} links={links} />
     </div>
   </section>
@@ -29,17 +30,3 @@ const { title, lang = "en", links = [] } = Astro.props;
     </HeaderLink>
   </nav>
 </header>
-<style>
-  .header-section {
-    display: flex;
-  }
-
-  .h2-title {
-    flex: 1;
-  }
-
-  .lang-select-holder {
-    flex: 1;
-    max-width: 8em;
-  }
-</style>

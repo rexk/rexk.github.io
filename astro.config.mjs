@@ -7,11 +7,11 @@ import image from "@astrojs/image";
 export default defineConfig({
   site: "https://rexk.github.io",
   markdown: {
-    drafts: true,
+    drafts: false,
   },
   integrations: [
     mdx({
-      drafts: true,
+      drafts: false,
     }),
     sitemap(),
     image({

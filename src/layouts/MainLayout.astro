@@ -22,7 +22,7 @@ const site = getLocalizedSite(lang);
   <body>
     <Header title={site.title} lang={lang} links={links} />
     <main>
-      <section class="container">
+      <section class="container mx-auto max-w-screen-lg px-3 py-6">
         <slot />
       </section>
     </main>

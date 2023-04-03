@@ -7,64 +7,72 @@ export interface LanguageSpecificLink {
 }
 
 export interface Props {
-    lang?: string | undefined,
-    links: LanguageSpecificLink[],
+  lang?: string | undefined;
+  links: LanguageSpecificLink[];
 }
 
-const { lang = 'en', links = [] } = Astro.props;
+const { lang = "en", links = [] } = Astro.props;
 
 const langMap = new Map<string, string>();
-links.forEach(link => {
-    langMap.set(link.lang, link.target);
+links.forEach((link) => {
+  langMap.set(link.lang, link.target);
 });
-
 ---
+
 <div class="nes-select lang-select">
-    <select required id="lang-select">
+  <select required id="lang-select">
     {
-        SUPPORTED_LANGUAGES.map((language) => (
-        <option value={language} selected={language === lang} data-target-link={langMap.get(language)}>
-            {KNOWN_LOCALIZED_LANGS[language]}
+      SUPPORTED_LANGUAGES.map((language) => (
+        <option
+          value={language}
+          selected={language === lang}
+          data-target-link={langMap.get(language)}
+        >
+          {KNOWN_LOCALIZED_LANGS[language]}
         </option>
-        ))
+      ))
     }
-    </select>
+  </select>
 </div>
 <script>
   const langSelect = document.querySelector("#lang-select");
   if (langSelect) {
-	const options = Array.from(langSelect.querySelectorAll('option')).map(e => e.value);
-	const langSet = new Set(options);
+    const options = Array.from(langSelect.querySelectorAll("option")).map(
+      (e) => e.value,
+    );
+    const langSet = new Set(options);
     langSelect.addEventListener("change", (e: Event) => {
       const currentTarget = e.currentTarget as HTMLSelectElement;
       const value = currentTarget.value;
-      const optionChildren = currentTarget.childNodes as NodeListOf<HTMLOptionElement>;
+      const optionChildren =
+        currentTarget.childNodes as NodeListOf<HTMLOptionElement>;
       const childrenArray = Array.from(optionChildren);
-      const option = childrenArray.find(o => o.value === value);
+      const option = childrenArray.find((o) => o.value === value);
       if (option && option.dataset && option.dataset.targetLink) {
         const targetLink = option.dataset.targetLink;
         window.location.href = targetLink;
         return;
       }
 
-	  const pathname = window.location.pathname;
-	  if (pathname === '/') {
-		window.location.href = `/${value}`;
-	  }
+      const pathname = window.location.pathname;
+      if (pathname === "/") {
+        window.location.href = `/${value}`;
+      }
 
-	  const size = pathname.split('/').filter(s => s).length;
-	  if (size === 1) {
-		if (langSet.has(pathname.replace('/', ''))) {
-			window.location.href = `/${value}`;
-		} else {
-			window.location.href = `/${value}${pathname}`;
-		}
-	  } else {
-		const parts = pathname.split('/').filter(s => s)
-		parts[0] = value;
-		window.location.href = '/' + parts.join('/');
-	  }
-
+      // remove trailing slash
+      const trimedPathname = pathname.replace(/\/$/g, '');
+      const size = trimedPathname.split("/").filter((s) => s).length;
+      if (size === 1) {
+        if (langSet.has(pathname.replace("/", ""))) {
+          window.location.href = `/${value}`;
+        } else {
+          window.location.href = `/${value}${pathname}`;
+        }
+      } else {
+        const parts = pathname.split("/").filter((s) => s);
+        parts[0] = value;
+        window.location.href = "/" + parts.join("/");
+      }
     });
   }
 </script>

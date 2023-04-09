@@ -1,6 +1,6 @@
 ---
 import type { CollectionEntry } from "astro:content";
-import type { LanguageSpecificLink } from '../components/LanguageSelect.astro';
+import type { LanguageSpecificLink } from "../components/LanguageSelect.astro";
 import BaseHead from "../components/BaseHead.astro";
 import Header from "../components/Header.astro";
 import Footer from "../components/Footer.astro";
@@ -9,16 +9,16 @@ import { getLocalizedSite } from "../data/site";
 import { KNOWN_LANGUAGES } from "../consts";
 
 type Props = CollectionEntry<"blog">["data"] & {
-  links?: LanguageSpecificLink[],
-}
+  links?: LanguageSpecificLink[];
+};
 
-const { 
-  title, 
-  description, 
-  pubDate, 
-  updatedDate, 
+const {
+  title,
+  description,
+  pubDate,
+  updatedDate,
   heroImage,
-  lang = 'en',
+  lang = "en",
   links = [],
 } = Astro.props as Props;
 
@@ -34,19 +34,52 @@ const site = getLocalizedSite(lang);
     <Header title={site.title} lang={lang} links={links} />
     <main>
       <article class="container mx-auto max-w-screen-lg px-3 py-6">
-        {heroImage && <img class="h-full w-full rounded-lg object-cover object-center" src={heroImage} alt="" />}
+        {
+          heroImage && (
+            <img
+              class="h-full w-full rounded-lg object-cover object-center"
+              src={heroImage}
+              alt=""
+            />
+          )
+        }
         <h1 class="title">{title}</h1>
-        { pubDate && <FormattedDate date={pubDate} locale={KNOWN_LANGUAGES[lang]} /> }
+        {
+          pubDate && (
+            <FormattedDate date={pubDate} locale={KNOWN_LANGUAGES[lang]} />
+          )
+        }
         {
           updatedDate && (
             <div class="last-updated-on">
-              Update: <FormattedDate date={updatedDate} locale={KNOWN_LANGUAGES[lang]} />
+              Update:{" "}
+              <FormattedDate
+                date={updatedDate}
+                locale={KNOWN_LANGUAGES[lang]}
+              />
             </div>
           )
         }
         <hr />
         <slot />
       </article>
+      <div class="giscus container mx-auto max-w-screen-lg px-3 py-6"></div>
+      <script
+        src="https://giscus.app/client.js"
+        data-repo="rexk/rexk.github.io"
+        data-repo-id="MDEwOlJlcG9zaXRvcnkyMTQ1MDQxMw=="
+        data-category-id="DIC_kwDOAUdOrc4CVAhW"
+        data-mapping="pathname"
+        data-strict="0"
+        data-reactions-enabled="1"
+        data-emit-metadata="1"
+        data-input-position="bottom"
+        data-theme="dark_dimmed"
+        data-lang="en"
+        data-loading="lazy"
+        crossorigin="anonymous"
+        async
+      ></script>
     </main>
     <Footer />
   </body>

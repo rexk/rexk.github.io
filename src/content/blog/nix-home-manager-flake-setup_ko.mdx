@@ -191,6 +191,7 @@ Home Manager의 공식 설치 문서를 따라하면, 아래와 같은 flake.nix
 ```diff
 +let
 +  user = import ./user.nix;
++ in
  {
 -  home.username = "jdoe";
 -  home.homeDirectory = "/home/jdoe";

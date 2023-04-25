@@ -1,0 +1,154 @@
+---
+group: "nix-home-manager-direnv"
+title: "Setting up home-manager with nix-direnv"
+description: |
+    With help of nix, flake, home-manager and nix-direnv. We can have almost reproducible dev
+    environments per each directory. This allows us to easily switch between slightly different
+    dev environment configurations without needing docker or virtual machine.
+pubDate: "2023-04-09"
+heroImage: "https://repository-images.githubusercontent.com/3386088/c9347c80-7b49-11e9-972e-03413da7be7a"
+tags: ["nix", "home-manager", "flake", "direnv"]
+lang: en
+draft: false
+---
+
+## Goal
+
+We've set up nix and home-manager with flake from our the previous post. In this post,
+we are going to further customize our dotfiles, and then integrate nix-direnv using
+home-manager so that we can start having reproducible dev environment per directory.
+
+For those of you that are impatient, a full snippets can be found at
+
+* https://github.com/rexk/home-manager-direnv-example/tree/nodejs-example
+* https://github.com/rexk/dotfiles/tree/nix-flake-install-stage-02
+
+## Before getting started
+
+Before getting started, let's add a convenient shell script so that we can interact with our
+dotfiles bare repo easier.
+
+Add following script at: `~/.config/bin/dit`
+
+```sh
+#!/usr/bin/env sh
+
+# ------------------------------------------------
+# dit - short hand for git for dotfiles
+# ------------------------------------------------
+# As we control dotfiles as git's bare repo, 
+# it is cumbersome to type out whole work-tree
+# git command to interact with our dotfiles folder
+#
+# dit command gives us easy access to control out dotilfes
+# without deviating too much from our `git` command flow
+
+
+CONFIG_DIR=${XDG_CONFIG_HOME:=$HOME/.config}
+git --git-dir=$HOME/.dotfiles.git --work-tree=$CONFIG_DIR "$@"
+```
+
+## direnv and nix-direnv
+
+`direnv` let me control directory level dev environment setup with `.envrc` file.
+But I would like to use this with nix's flake. Luckily there is a community project
+laready exists with nix and direnv integration, nix-direnv.
+
+With home-manager, it is really simple to integrate nix-direnv with my current system.
+
+```diff
+@@ -5,5 +5,7 @@ in
+   home.username = user.name;
+   home.homeDirectory = user.homeDir;
+   home.stateVersion = "22.11";
++
++  programs.direnv.enable = true;
+ }
+ ```
+
+After the file is updated, now we need to run our `hms` (home-manager switch) command.
+
+We can verify our installation by running `direnv` from the terminal.
+
+```sh
+direnv --version
+2.32.1
+```
+
+Now that, we have dirnev installed, it is time for us to test out our direnv setup.
+
+I would like to set up a nodejs project using express NodeJs version with 18.x LTS.
+
+1. Create a project directory
+2. Add flake.nix
+3. Update flake.nix to pull nodejs 18.x
+4. Add .envrc
+5. Execute `direnv allow`
+
+```sh
+mkdir -p nodejs-18-example
+cd nodejs-18-example
+```
+
+Then, we are going to add following flake.nix at the root of nodejs-18-example
+
+```nix
+{
+  description = "nodejs-18-example-flake";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.11";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs = { nixpkgs, flake-utils, ... }:
+    let
+      utils = flake-utils;
+    in
+    utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+      in
+      {
+        formatter = pkgs.nixpkgs-fmt;
+
+        devShell = pkgs.mkShell {
+          nativeBuildInputs = with pkgs; [
+            nodejs-18_x
+          ];
+        };
+      }
+    );
+}
+```
+
+Before we proceed further, flake.nix file must be commited into git.
+
+```sh
+git add flake.nix
+git commit -am "Add flake.nix"
+```
+
+Once flake.nix file is committed, we are going to add `.envrc` file with the following content:
+
+```sh
+use flake
+```
+
+Once both files are successfully added, we are going to see following error messages:
+
+```sh
+direnv: error /home/rexk/rexk-workspace/home-manager-direnv-example/nodejs-18-express/.envrc is blocked. Run `direnv allow` to approve its content
+```
+
+Run `direnv allow` so that direnv can do its job.
+
+Now, nix and direnv will do its magic, and download nodejs for us.
+
+```sh
+node --version
+v18.14.1
+```
+
+As long as flake.lock file and flake.nix file does not change, nodejs-18-express will alawys
+use same nodejs versions no matter who enter this project. Neat

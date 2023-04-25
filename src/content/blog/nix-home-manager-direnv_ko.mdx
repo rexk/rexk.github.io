@@ -1,0 +1,150 @@
+---
+group: "nix-home-manager-direnv"
+title: "home-manager 와 nix-direnv 설정"
+description: |
+    nix, flake, home-manager, nix-direnv를 이용하여 거의 재현 가능한 개발 환경을 각 디렉토리마다 구성할 수 있습니다. 이를 통해 도커나 가상 머신 없이도 조금씩 다른 개발 환경 구성 간에 쉽게 전환할 수 있습니다. 이를 통해 개발자는 프로젝트마다 환경을 쉽게 관리하고, 이전과 같은 개발 환경에서 작업을 계속할 수 있습니다. 이는 팀 프로젝트에서 특히 유용하며, 모든 팀원이 동일한 개발 환경을 유지할 수 있도록 합니다.
+pubDate: "2023-04-09"
+heroImage: "https://repository-images.githubusercontent.com/3386088/c9347c80-7b49-11e9-972e-03413da7be7a"
+tags: ["nix", "home-manager", "flake", "direnv"]
+lang: ko
+draft: false
+---
+
+## Goal
+
+이전 게시물에서 nix와 home-manager를 flake와 함께 설정했습니다. 이번 게시물에서는 dotfiles를 더욱 맞춤화하고 home-manager를 사용하여 nix-direnv를 통합하여 디렉토리별로 재현 가능한 개발 환경을 만들 것입니다.
+
+참고로 급하신 분들을 위해 코드 조각은 아래에서 확인할 수 있습니다.
+
+https://github.com/rexk/dotfiles/tree/nix-flake-install-stage-02
+
+## 시작하기 전에
+
+시작하기 전에 편리한 셸 스크립트를 추가하여 dotfiles bare repo와 쉽게 상호작용할 수 있도록 하겠습니다.
+
+다음 스크립트를 ~/.config/bin/dit에 추가하세요.
+
+```sh
+#!/usr/bin/env sh
+
+# ------------------------------------------------
+# dit - short hand for git for dotfiles
+# ------------------------------------------------
+# As we control dotfiles as git's bare repo, 
+# it is cumbersome to type out whole work-tree
+# git command to interact with our dotfiles folder
+#
+# dit command gives us easy access to control out dotilfes
+# without deviating too much from our `git` command flow
+
+
+CONFIG_DIR=${XDG_CONFIG_HOME:=$HOME/.config}
+git --git-dir=$HOME/.dotfiles.git --work-tree=$CONFIG_DIR "$@"
+```
+
+## direnv와 nix-direnv
+
+direnv를 사용하면 .envrc 파일로 디렉토리 수준의 개발 환경 설정을 제어할 수 있습니다. 그러나 이를 nix의 flake와 함께 사용하고 싶습니다. 운이 좋게도 nix와 direnv를 통합한 커뮤니티 프로젝트인 nix-direnv가 이미 존재합니다.
+
+home-manager를 사용하면 현재 시스템에 nix-direnv를 통합하는 것이 매우 간단합니다.
+
+
+```diff
+@@ -5,5 +5,7 @@ in
+   home.username = user.name;
+   home.homeDirectory = user.homeDir;
+   home.stateVersion = "22.11";
++
++  programs.direnv.enable = true;
+ }
+ ```
+
+
+파일을 업데이트한 후에는 hms (home-manager switch) 명령을 실행해야 합니다.
+
+터미널에서 direnv를 실행하여 설치를 확인할 수 있습니다.
+
+```sh
+direnv --version
+2.32.1
+```
+
+이제 direnv가 설치되었으므로 direnv 설정을 테스트 할 시간입니다.
+
+저는 nodejs 프로젝트 설정하고 싶습니다. 버전은 18.x LTS로 설정하겠습니다.
+
+1. 프로젝트 디렉토리 만들기
+2. flake.nix 추가
+3. flake.nix를 업데이트하여 nodejs 18.x 가져오기
+4. .envrc 추가
+5. `direnv allow` 실행
+
+
+```sh
+mkdir -p nodejs-18-example
+cd nodejs-18-example
+```
+
+그런 다음 nodejs-18-example의 루트에 다음 flake.nix를 추가합니다.
+
+```nix
+{
+  description = "nodejs-18-example-flake";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-22.11";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs = { nixpkgs, flake-utils, ... }:
+    let
+      utils = flake-utils;
+    in
+    utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+      in
+      {
+        formatter = pkgs.nixpkgs-fmt;
+
+        devShell = pkgs.mkShell {
+          nativeBuildInputs = with pkgs; [
+            nodejs-18_x
+          ];
+        };
+      }
+    );
+}
+```
+
+계속 진행하기 전에 flake.nix 파일을 git에 커밋해야합니다.
+
+```sh
+git add flake.nix
+git commit -am "Add flake.nix"
+```
+
+flake.nix 파일을 커밋한 후, 다음 내용으로 .envrc 파일을 추가합니다.
+
+
+```sh
+use flake
+```
+
+두 파일이 모두 성공적으로 추가되면 다음과 같은 오류 메시지가 표시됩니다.
+
+``sh
+direnv: error /home/rexk/rexk-workspace/home-manager-direnv-example/nodejs-18-express/.envrc is blocked. Run `direnv allow` to approve its content
+```
+
+direnv가 작동하도록 direnv allow를 실행합니다.
+
+이제 nix와 direnv가 nodejs 설치를 할 겁니다.
+
+
+```sh
+node --version
+v18.14.1
+```
+
+flake.lock 파일과 flake.nix 파일이 변경되지 않는 한, nodejs-18-express는 누가 이 프로젝트에 들어와도 항상 동일한 nodejs 버전을 사용합니다. 멋지죠.

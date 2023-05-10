@@ -1,0 +1,163 @@
+---
+group: "home-manager-and-dotfiles"
+title: "home-manager and dotfiles"
+description: |
+  Nix home-manager를 사용하면 nix를 사용하여 사용자 환경을 제어하며, 닷파일과 시스템 구성을 관리하는 선언적인 방식을 제공합니다. 하지만, 모든 것을 nix로 해결할 필요는 없습니다.
+
+pubDate: "2023-04-29"
+heroImage: "https://repository-images.githubusercontent.com/3386088/c9347c80-7b49-11e9-972e-03413da7be7a"
+tags: ["nix", "home-manager", "dotfiles"]
+lang: ko
+draft: false
+---
+
+# 소개
+
+Nix home-manager를 사용하면 당신은 nix를 사용하여 사용자 환경을 제어할 수 있으며, 닷파일과 시스템 구성을 관리하는 선언적인 방식을 제공합니다. 하지만, 모든 것을 nix로 해결할 필요는 없습니다. 원한다면, home-manager를 사용하여 다른 닷파일과 시스템 구성을 관리하면서 일부 커스터마이징을 수동으로 조정할 수도 있습니다. 예를 들어, 특정 어플리케이션을 위한 구성 파일을 수동으로 관리하면서 home-manager가 나머지를 처리하도록 할 수 있습니다. 이러한 접근 방식은 중앙 집중식 구성 관리와 제어된 커스터마이징 사이의 균형을 유지할 수 있도록 도와줍니다. 대부분의 구성 파일을 home-manager로 관리하면, 선언적인 방식의 이점을 유지하면서 특정 경우에 유연성을 유지할 수 있습니다.
+
+
+# 목표
+이 포스트에서는 nix home-manager를 사용하여 zsh, fish 및 bash 구성을 설정합니다. 
+터미널 환경을 nix만을 이용해서 설정 하지는 않을 것입니다.
+
+목표는 합리적인 구성 계층 구조를 설정하여 다음을 제공하는 것입니다.
+
+1. 팀 전체에서 공유 할 수있는 Nix 구성
+1. 조직 전체 구성 제공
+1. 사용자 레벨 커스터마이징 지원 
+
+# 상세
+
+먼저 home-manager를 통해 bash, zsh, fish를 활성화해야 합니다. 
+이를 위해서는 ~/.config/home-manager/home.nix 파일을 다음과 같이 업데이트해야 합니다.
+
+```diff
+   home.stateVersion = "22.11";
+
+   programs.direnv.enable = true;
++
++  programs.bash.enable = true;
++  programs.zsh.enable = true;
++  programs.fish.enable = true;
+}
+```
+
+파일을 저장한 후, 홈 구성을 적용해야 합니다. 이미 $HOME/.config/bin/hms에 이를 위한 편리한 스크립트를 만들어 두었으므로, 이를 호출해 보겠습니다.
+
+
+```sh
+$HOME/.config/bin/hms
+
+Starting Home Manager activation
+Activating checkFilesChanged
+Activating checkLinkTargets
+Existing file '/home/rexk/.bashrc' is in the way of '/nix/store/pzf4zq0ls1lj7jqfch0yf114mw8gn3hj-home-manager-files/.bashrc'
+Please move the above files and try again or use 'home-manager switch -b backup' to back up existing files automatically.
+```
+
+Oh, of course. home-manager wants to create symlink on  `~/.bashrc`, `~/.zshrc`, and `~/.config/fish/config.fish`,
+but we usuall already have our own file there. Since we are using
+nix flake to control home-manager rather than usual home-manager route, we can't use
+`home-manager switch -b backup` command. So let's back everything up ourselves
+
+```sh
+mv ~/.bashrc ~/.bashrc.bak
+mv ~/.zshrc ~/.zshrc.bak
+mv ~/.config/fish/config.fish ~/.config/fish/config.fish.bak
+```
+
+당연히도. home-manager는 ~/.bashrc, ~/.zshrc, ~/.config/fish/config.fish에 심볼릭 링크를 만들려고 하지만, 보통 이미 해당 파일이 있습니다. 우리는 일반적인 home-manager 경로 대신 nix flake를 사용하여 home-manager를 제어하기 때문에 home-manager switch -b backup 명령을 사용할 수 없습니다. 그래서 우리는 직접 모든 것을 백업해야 합니다.
+
+
+```sh
+#!/usr/bin/env bash
+
+backup_file_if_exists() {
+  local file="$1"
+
+  if [ -f $file ];
+  then
+    mv -f $file $file.bak 
+  fi
+}
+
+backup_file_if_exists ~/.bashrc
+backup_file_if_exists ~/.zshrc
+backup_file_if_exists ~/.config/fish/config.fish
+
+case "$(uname -s)" in
+  Darwin)
+    # for MacOS as we would be installing 
+    # nix-darwin as well
+    # it is good idea to back up the original 
+    sudo backup_file_if_exists /etc/zshrc
+    sudo backup_file_if_exists /etc/bashrc
+    ;;
+esac
+```
+
+파일들이 백업이 다 되었다면, 다시 한번 시도해 봅니다.
+
+
+```sh
+$HOME/.config/bin/hms
+
+tarting Home Manager activation
+Activating checkFilesChanged
+Activating checkLinkTargets
+Activating writeBoundary
+Activating installPackages
+replacing old 'home-manager-path'
+installing 'home-manager-path'
+Activating linkGeneration
+Cleaning up orphan links from /home/rexk
+Creating profile generation 29
+Creating home file links in /home/rexk
+Activating onFilesChange
+Activating reloadSystemd
+```
+
+훨씬 괜찮네요.
+
+모든 쉘을 nix로 구성해 볼 수 있지만, 아무래도 익숙한 쉘 파일에서 쉘 설정을 하는 것이 좀 더 편하겠지요,
+그것이 nix 환경을 조금 impure하게 만든다고 해도 말이죠.
+
+그러므로, ~/.config/home-manager/home.nix 파일에 약간의 변경을 가해 보겠습니다.
+
+```diff
+   home.stateVersion = "22.11";
+
+   programs.direnv.enable = true;
++
++  programs.bash = {
++    enable = true;
++    initExtra = "
++if [ -f $HOME/.config/bash/.bashrc ];
++then
++  source $HOME/.config/bash/.bashrc
++fi
++";
++  };
++  programs.fish = {
++    enable = true;
++    initExtra = "
++if test -f $HOME/.config/fish/config.base.fish;
++then
++  source $HOME/.config/fish/config.base.fish
++fi
++";
++  };
++  programs.zsh = {
++    enable = true;
++    initExtra = "
++if [ -f $HOME/.config/zsh/.zshrc ];
++then
++  source $HOME/.config/zsh/.zshrc
++fi
++  };
+```
+
+
+대신 nix를 사용하여 많은 것을 구성하는 대신, 우리는 각각의 rc 파일에 대한 설정을 적절하게 위임할 것입니다. 
+이렇게 함으로써, 더 많은 nix 및 home-manager 구성 구조를 학습할 필요 없이 익숙한 구성을 계속 사용할 수 있습니다.
+

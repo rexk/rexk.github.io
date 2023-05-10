@@ -1,0 +1,183 @@
+---
+group: "home-manager-and-dotfiles"
+title: "home-manager and dotfiles"
+description: |
+    Nix home-manager allows you to control your user environment using nix,
+    providing a declarative approach to managing your dotfiles and system 
+    configuration. However, it's worth noting that you don't have to use nix 
+    for everything.
+    
+pubDate: "2023-04-29"
+heroImage: "https://repository-images.githubusercontent.com/3386088/c9347c80-7b49-11e9-972e-03413da7be7a"
+tags: ["nix", "home-manager", "dotfiles"]
+lang: en
+draft: false
+---
+
+# Introduction
+
+Nix home-manager allows you to control your user environment using nix,
+providing a declarative approach to managing your dotfiles and system
+configuration. However, it's worth noting that you don't have to use nix
+for everything. If you choose to, you can still use home-manager to manage
+your other dotfiles and system configuration while controlling some
+customization manually. For instance, you can manage a specific
+configuration file for a particular application manually, while letting
+home-manager handle everything else. This approach lets you strike
+a balance between centralized configuration management and controlled
+customization. By using home-manager to manage most of
+your configuration files, you can still benefit from its declarative
+approach, while keeping some level of flexibility for specific cases.
+
+# Goal
+
+In this post, we are going to set zsh, fish and bash configuration using
+nix home-manager. However, the goal is not to use nix for everything.
+
+The goal is to set up sensible configuration hierarchical structure such that
+
+1. Nix configurations that can be shared entire engineering team
+1. Provides an organization wide configuration
+1. Does not compromise on user-level customization
+
+To demonstrate an ability above, we are going to set up, bash, zsh, and fish.
+
+# Details
+
+## Initial bash, zsh, and fish setup.
+
+First we are going to set bash, zsh, and fish enabled through home-manager. To do that,
+`~/.config/home-manager/home.nix` must be updated as following.
+
+```diff
+   home.stateVersion = "22.11";
+
+   programs.direnv.enable = true;
++
++  programs.bash.enable = true;
++  programs.zsh.enable = true;
++  programs.fish.enable = true;
+}
+```
+
+Once the file is saved, we need to apply the home-configuration. We've alraedy created the handy
+script to do that at `$HOME/.config/bin/hms`, so let's call that.
+
+
+```sh
+$HOME/.config/bin/hms
+
+Starting Home Manager activation
+Activating checkFilesChanged
+Activating checkLinkTargets
+Existing file '/home/rexk/.bashrc' is in the way of '/nix/store/pzf4zq0ls1lj7jqfch0yf114mw8gn3hj-home-manager-files/.bashrc'
+Please move the above files and try again or use 'home-manager switch -b backup' to back up existing files automatically.
+```
+
+Oh, of course. home-manager wants to create symlink on  `~/.bashrc`, `~/.zshrc`, and `~/.config/fish/config.fish`,
+but we usuall already have our own file there. Since we are using
+nix flake to control home-manager rather than usual home-manager route, we can't use
+`home-manager switch -b backup` command. So let's back everything up ourselves
+
+```sh
+mv ~/.bashrc ~/.bashrc.bak
+mv ~/.zshrc ~/.zshrc.bak
+mv ~/.config/fish/config.fish ~/.config/fish/config.fish.bak
+```
+
+Since, this might be common for many people, let's make a script that people can use.
+Let's call this script `backup-original-rc-files` and place it under `~/.config/bin`
+
+```sh
+#!/usr/bin/env bash
+
+backup_file_if_exists() {
+  local file="$1"
+
+  if [ -f $file ];
+  then
+    mv -f $file $file.bak 
+  fi
+}
+
+backup_file_if_exists ~/.bashrc
+backup_file_if_exists ~/.zshrc
+backup_file_if_exists ~/.config/fish/config.fish
+
+case "$(uname -s)" in
+  Darwin)
+    # for MacOS as we would be installing 
+    # nix-darwin as well
+    # it is good idea to back up the original 
+    sudo backup_file_if_exists /etc/zshrc
+    sudo backup_file_if_exists /etc/bashrc
+    ;;
+esac
+```
+
+Once all files are backed up, let's try again
+
+```sh
+$HOME/.config/bin/hms
+
+tarting Home Manager activation
+Activating checkFilesChanged
+Activating checkLinkTargets
+Activating writeBoundary
+Activating installPackages
+replacing old 'home-manager-path'
+installing 'home-manager-path'
+Activating linkGeneration
+Cleaning up orphan links from /home/rexk
+Creating profile generation 29
+Creating home file links in /home/rexk
+Activating onFilesChange
+Activating reloadSystemd
+```
+
+Ok, that's better.
+
+We can try to configure all of our shell with nix, but I would rather want to keep most of our
+shell configurations in our usual shell file, despite we are making our nix environment impure.
+
+So, let's give a bit more changes on to our `~/.config/home-manager/home.nix` file.
+
+
+```diff
+   home.stateVersion = "22.11";
+
+   programs.direnv.enable = true;
++
++  programs.bash = {
++    enable = true;
++    initExtra = "
++if [ -f $HOME/.config/bash/.bashrc ];
++then
++  source $HOME/.config/bash/.bashrc
++fi
++";
++  };
++  programs.fish = {
++    enable = true;
++    initExtra = "
++if test -f $HOME/.config/fish/config.base.fish;
++then
++  source $HOME/.config/fish/config.base.fish
++fi
++";
++  };
++  programs.zsh = {
++    enable = true;
++    initExtra = "
++if [ -f $HOME/.config/zsh/.zshrc ];
++then
++  source $HOME/.config/zsh/.zshrc
++fi
++  };
+```
+
+Instead of configuring bunch of things through nix, we are simply going to delegate
+further configurations into respectful rc files. This allows us to keep using familiar
+configuration without needing to learn more on nix and it's home-manager configuration
+structure.
+

@@ -1,0 +1,286 @@
+---
+group: "nix-home-manager-at-scale"
+title: "Nix and Home Manager at Scale"
+description: |
+    home-manager 설정과 쉘 설정 모두에서 추가적인 계층 구조를 만들 것입니다. 이렇게 함으로써 공통 설정을 사용자별 설정에서 분리할 수 있습니다. 
+    이는 사용자의 맞춤 설정을 훼손하지 않으면서 공통 설정을 유지할 수 있게 해줍니다.
+    
+pubDate: "2023-05-14"
+heroImage: "https://repository-images.githubusercontent.com/3386088/c9347c80-7b49-11e9-972e-03413da7be7a"
+tags: ["nix", "home-manager", "dotfiles"]
+lang: ko
+draft: false
+---
+
+## 목표
+
+home-manager 설정과 쉘 설정 양쪽에서 추가적인 계층 구조를 생성하여 공통 설정과 사용자별 설정을 분리할 수 있게 할 것입니다. 이를 통해 사용자의 맞춤 설정을 손상시키지 않고 공통 설정을 유지할 수 있습니다.
+
+
+업데이트 시작점:https://github.com/rexk/dotfiles/tree/nix-flake-install-stage-04
+
+업데이트 후: https://github.com/rexk/dotfiles/tree/nix-flake-install-stage-05
+
+
+## home manager 설정
+
+사용자별 설정을 제공하기 위해 다음과 같은 변경 사항을 수행하려고 합니다.
+
+1. home.nix를 업데이트하여 사용자별 설정을 가져오도록 합니다.
+2. 사용자별 설정을 시작할 수 있는 공통 템플릿을 제공합니다.
+3. 공통 패키지 세트를 제공합니다.
+4. 사용자별 설정을 통해 이러한 공통 패키지를 재정의할 수 있는 수단을 제공합니다.
+
+
+```diff
++# This is common homemanager configuration file
++# with common setup.
++#
++# DO NOT MODIFY this file unless, unless
++# the change can meant to be supplied to
++# others.
++#
++# For user specific customization, use home.user.nix
++{ config, pkgs, lib, ... }:
+ let
++  if-exists = f: builtins.pathExists f;
++  existing-imports = imports: builtins.filter if-exists imports;
+   user = import ./user.nix;
+ in
+ {
++  imports = existing-imports [
++    ./home.user.nix
++  ];
++
+   home.username = user.name;
+   home.homeDirectory = user.homeDir;
+   home.stateVersion = "22.11"; import ./user.nix;
+ in
+ {
+```
+
+위의 변경 사항은 `home.user.nix` 파일을 가져올 수 있게 해줍니다. 해당 파일이 없는 경우에는 여전히 `home.nix`를 사용합니다.
+
+또한, `home.packages`에 대한 업데이트를 아직 수행하지 않습니다. 이는 `home.nix`와 `home.user.nix`에서 모두 패키지 목록을 관리하는 것보다는 `home.user.nix`만을 통해 패키지 목록을 관리하는 것이 훨씬 쉽기 때문입니다.
+
+하지만, `home.user.nix` 파일에 일련의 공통 패키지를 직접 하드코딩하고 싶지는 않습니다.
+
+그래서 `provided-pkgs.nix` 파일을 생성할 것입니다.
+
+```nix
+# This file should be maintained by a team X
+# DO NOT MODIFY directly
+# for local configurations use home.user.nix
+{ pkgs, lib, ... }:
+let
+  removeAll = excludes: all: lib.lists.fold (acc: item: lib.lists.remove item acc) all excludes;
+  provided-pkgs = with pkgs; [
+    # Provide org-wide packages here
+    bashInteractive
+    jq
+    curl
+    git 
+    nodejs-18_x
+  ];
+  with-user-pkgs = inst:
+    let
+      excludes = inst.excludes;
+      includes = inst.includes;
+      without-excludes = removeAll excludes provided-pkgs;
+    in
+    lib.lists.unique (provided-pkgs ++ includes);
+in
+{
+  inherit provided-pkgs;
+  inherit with-user-pkgs;
+}
+```
+
+그리고, `home.user.nix`
+
+```nix
+{ pkgs, lib, ... }:
+let
+  provided-pkgs-args = { inherit pkgs; inherit lib; };
+  provided-pkgs = import ./provided-pkgs.nix provided-pkgs-args;
+in
+{
+  home.packages = with pkgs;
+    provided-pkgs.with-user-pkgs {
+      excludes = [ ];
+      includes = [
+        gh
+        exa
+        lazygit
+        bat
+        zellij
+        unstable.neovim
+        python311
+        python311Packages.pip
+      ];
+    };
+
+  programs.starship = {
+    enable = true;
+  };
+}
+```
+
+`provided-pkgs.nix`는 사용자가 home-manager 패키지를 관리할 수 있는 깔끔한 기능을 제공합니다. 예를 들어, nodejs 18.x 대신 14.x를 사용하고 싶다고 가정해 봅시다. 사용자는 이제 home.user.nix 파일을 다음과 같이 업데이트할 수 있습니다.
+
+```nix
+home.packages = with pkgs; 
+  provided-pkgs.with-user-pkgs {
+    excludes = [
+        # opt out the packages from provided-pkgs
+        nodejs-18_x
+    ];
+    includes = [
+        nodejs-14_x
+    ];
+  }
+```
+
+home-managerd 설정 방법을 자세히 모르더라고, 사용자 패키지 설정을 할 수 있게 되었습니다.
+provided-pkgs.nix를 커밋하긴 원하지만, `home.user.nix`를 dotfiles에 체크인하고 싶지는 않습니다. 
+각 사용자마다 설정이 다를 것이기 때문입니다. 그래서 `home.user.nix` 대신 `home.user.nix.tpl` 이라는 파일을 생성할 것입니다. 
+사용자는 `home.user.nix.tpl` 의 내용을 복사하여 home.user.nix로 사용을 시작할 수 있습니다.
+
+## 쉘 설정
+
+home-manager 설정 변경과 유사하게 각 쉘에 대한 설정의 계층 구조를 만들어 보려고 합니다.
+이전 게시물에서는 다음과 같은 방식으로 지원할 각 쉘에 대한 계층 구조를 생성했습니다.
+
+
+```
+.
+├── .bashrc                    # controlled by nix
+├── .zshrc                     # controlled by nix
+├── .config 
+│  ├── bash
+│  │  └── .bashrc              # custom bash config
+│  ├── zsh
+│  │  └── .zshrc               # custom zsh config
+│  ├── fish
+│  │  ├── config.fish          # controlled by nix
+|  │  └── config.base.fish     # custom fish config
+```
+
+We would like to change them into followings:
+
+```
+.
+├── .bashrc                    # controlled by nix
+├── .zshrc                     # controlled by nix
+├── .config 
+│  ├── bash
+│  │  ├── .bashrc              # common bash config
+│  │  ├── user.bash            # user bash config
+│  │  └── secret.bash          # place for API tokens, secrets... etc
+│  ├── zsh
+│  │  ├── .zshrc               # common zsh config
+│  │  ├── user.zsh             # user zsh config
+│  │  └── secret.zsh           # place for API tokens, secrets... etc
+│  ├── fish
+│  │  ├── config.fish          # controlled by nix
+│  │  ├── config.base.fish     # common fish config
+│  │  ├── config.user.fish     # user fish config
+|  │  └── config.secret.fish   #  place for API tokens, secrets... etc
+```
+
+
+home.nix 파일에서 수행한 것과 마찬가지로 각 사용자 설정 파일을 업데이트하여 조건부 파일 가져오기를 추가해야 합니다.
+
+이 작업을 위해 다음과 같이 .bashrc, .zshrc, config.base.fish 파일에 몇 줄을 추가합니다.
+
+.bashrc
+
+```sh
+# DO NOT MODIFY this file unless, the change is required
+# for all memebers.
+#
+# This file provide set of common bash configurations
+# that are useful for all of us.
+
+# set up PATH
+export PATH=$PATH:$HOME/.config/bin
+
+if [ -f $HOME/.config/bash/user.bash ]; then
+	source $HOME/.config/bash/user.bash
+fi
+
+if [ -f $HOME/.config/bash/secret.bash ]; then
+	source $HOME/.config/bash/secret.bash
+fi
+```
+
+.zshrc
+
+```sh
+# DO NOT MODIFY this file unless, the change is required
+# for all memebers.
+#
+# This file provide set of common zsh configurations
+# that are useful for all of us.
+
+# region: setup
+# TODO:: add more configs
+# endregion 
+
+if [ -f $HOME/.config/zsh/user.zsh ]; then
+  source $HOME/.config/zsh/user.zsh
+fi
+
+if [ -f $HOME/.config/zsh/secret.zsh ]; then
+  source $HOME/.config/zsh/secret.zsh
+fi
+```
+
+config.base.fish
+
+```fish
+# DO NOT MODIFY this file unless, the change is required
+# for all memebers.
+#
+# This file provide set of common fish configurations
+# that are useful for all of us.
+
+# region: setup
+# TODO:: add more configs
+# endregion 
+
+if test -f $HOME/.config/fish/config.user.fish
+  source $HOME/.config/fish/config.user.fish
+end
+
+if test -f $HOME/.config/fish/config.secret.fish
+  source $HOME/.config/fish/config.secret.fish
+end
+```
+
+이제 이 새로운 구조를 테스트할 준비가 되었습니다. 시연을 위해 사용자 지정 zsh 설정을 추가해 보겠습니다.
+
+```sh
+cat <<EOF > ~/.config/zsh/user.zsh
+echo "My Custom config"
+EOF
+
+zsh # loading a new zsh session
+```
+
+
+그리고 zsh 세션에서 다음을 출력될 겁니다.
+
+```
+My Custom config
+```
+
+## 결론
+
+일반적인 설정 대신에 개인화된 설정을 제공하는 방식으로 조직 내 모든 사람을 위한 공통 설정을 제공하면서 각 사용자가 자신의 환경을 커스터마이즈할 수 있는 Nix 설정을 만들었습니다.
+
+provided-pkgs.nix 파일은 팀 내 모든 사람에게 배포하고자 하는 공통 패키지를 제공하는 데 사용되며, home.user.nix 파일은 사용자별 추가 커스터마이즈를 제공하는 데 사용될 수 있습니다.
+
+마찬가지로, 일반적인 셸 설정은 `~/.config/bash/.bashrc`, `~/.config/zsh/.zshrc`, `~/.config/fish/config.base.fish`로 
+관리되며, `~/.config/bash/user.bash`, `~/.config/zsh/user.zsh`, `~/.config/fish/config.user.fish`는 사용자의 
+추가 커스터마이즈를 위한 공간을 제공합니다. 이를 통해 Nix를 사용하여 위의 셸 환경을 설정할 필요 없이 사용자가 더 많은 커스터마이즈를 할 수 있습니다.

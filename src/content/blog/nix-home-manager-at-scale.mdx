@@ -1,0 +1,301 @@
+---
+group: "nix-home-manager-at-scale"
+title: "Nix and Home Manager at Scale"
+description: |
+    We are going to create further hierarchy on both home-manager configurations
+    and shell configurations so that we can separate common configuration out of user
+    specific configurations. This allows us to maintain set of common setup, without
+    compromising user customization.
+    
+pubDate: "2023-05-14"
+heroImage: "https://repository-images.githubusercontent.com/3386088/c9347c80-7b49-11e9-972e-03413da7be7a"
+tags: ["nix", "home-manager", "dotfiles"]
+lang: en
+draft: false
+---
+
+## Goal
+
+We are going to create further hierarchy on both home-manager configurations
+and shell configurations so that we can separate common configuration out of user
+specific configurations. This allows us to maintain set of common setup, without
+compromising user customization.
+
+We are going to start making these changes from https://github.com/rexk/dotfiles/tree/nix-flake-install-stage-04
+
+For those who are impatient, you can find the final result at https://github.com/rexk/dotfiles/tree/nix-flake-install-stage-05
+
+
+## home manager configurations
+
+In order to provide user specific configurations, we would like to make following changes.
+
+1. Update home.nix to import user specific configurations, if exists
+2. Provide common template for invidual users to get started with user specific configurations
+3. Provide set of common packages.
+4. Provide means to override those common packages via user specific configurations.
+
+
+```diff
++# This is common homemanager configuration file
++# with common setup.
++#
++# DO NOT MODIFY this file unless, unless
++# the change can meant to be supplied to
++# others.
++#
++# For user specific customization, use home.user.nix
++{ config, pkgs, lib, ... }:
+ let
++  if-exists = f: builtins.pathExists f;
++  existing-imports = imports: builtins.filter if-exists imports;
+   user = import ./user.nix;
+ in
+ {
++  imports = existing-imports [
++    ./home.user.nix
++  ];
++
+   home.username = user.name;
+   home.homeDirectory = user.homeDir;
+   home.stateVersion = "22.11"; import ./user.nix;
+ in
+ {
+```
+
+Above changes, allow us to import `home.user.nix`, if exists, otherwise, we are still going
+to make use home.nix.
+
+Also note that we are not making any update on `home.packages`, yet. This is because
+It is a lot easier to manage list of packages only through `home.user.nix`, instead of
+doing it both in  `home.nix` and `home.user.nix`.
+
+But we don't want to just hard code set of common packages in `home.user.nix` file.
+
+For that, we are going to create `provided-pkgs.nix` file
+
+```nix
+# This file should be maintained by a team X
+# DO NOT MODIFY directly
+# for local configurations use home.user.nix
+{ pkgs, lib, ... }:
+let
+  removeAll = excludes: all: lib.lists.fold (acc: item: lib.lists.remove item acc) all excludes;
+  provided-pkgs = with pkgs; [
+    # Provide org-wide packages here
+    bashInteractive
+    jq
+    curl
+    git 
+    nodejs-18_x
+  ];
+  with-user-pkgs = inst:
+    let
+      excludes = inst.excludes;
+      includes = inst.includes;
+      without-excludes = removeAll excludes provided-pkgs;
+    in
+    lib.lists.unique (provided-pkgs ++ includes);
+in
+{
+  inherit provided-pkgs;
+  inherit with-user-pkgs;
+}
+```
+
+Then, time to add `home.user.nix`
+
+```nix
+{ pkgs, lib, ... }:
+let
+  provided-pkgs-args = { inherit pkgs; inherit lib; };
+  provided-pkgs = import ./provided-pkgs.nix provided-pkgs-args;
+in
+{
+  home.packages = with pkgs;
+    provided-pkgs.with-user-pkgs {
+      excludes = [ ];
+      includes = [
+        gh
+        exa
+        lazygit
+        bat
+        zellij
+        unstable.neovim
+        python311
+        python311Packages.pip
+      ];
+    };
+
+  programs.starship = {
+    enable = true;
+  };
+}
+```
+
+The `provided-pkgs.nix` provides very neat function for users to manage home-manager
+packages. For example, let's say, I would like to use nodejs 14.x over 18.x. A user
+can now update home.user.nix file into
+
+```nix
+home.packages = with pkgs; 
+  provided-pkgs.with-user-pkgs {
+    excludes = [
+        # opt out the packages from provided-pkgs
+        nodejs-18_x
+    ];
+    includes = [
+        nodejs-14_x
+    ];
+  }
+```
+
+Users can now customize further without needing to intricacy of home-manager's detail.
+While we would like to commit `provided-pkgs.nix`, we do not want to check in `home.user.nix`
+into our dotfiles, as it would be different per each user. So instead of checking
+in `home.user.nix`, we are going to create a file called `home.user.nix.tpl`, so that
+users can easily get started by copying content of `home.user.nix.tpl` as home.user.nix.
+
+## shell configurations
+
+Similar to changes of home-manager configurations, we are going to separate create hierarchy
+of shell configurations.
+
+In the previous post, we've created hierarchy for each shell that we are going to support in
+following manner.
+
+```
+.
+├── .bashrc                    # controlled by nix
+├── .zshrc                     # controlled by nix
+├── .config 
+│  ├── bash
+│  │  └── .bashrc              # custom bash config
+│  ├── zsh
+│  │  └── .zshrc               # custom zsh config
+│  ├── fish
+│  │  ├── config.fish          # controlled by nix
+|  │  └── config.base.fish     # custom fish config
+```
+
+We would like to change them into followings:
+
+```
+.
+├── .bashrc                    # controlled by nix
+├── .zshrc                     # controlled by nix
+├── .config 
+│  ├── bash
+│  │  ├── .bashrc              # common bash config
+│  │  ├── user.bash            # user bash config
+│  │  └── secret.bash          # place for API tokens, secrets... etc
+│  ├── zsh
+│  │  ├── .zshrc               # common zsh config
+│  │  ├── user.zsh             # user zsh config
+│  │  └── secret.zsh           # place for API tokens, secrets... etc
+│  ├── fish
+│  │  ├── config.fish          # controlled by nix
+│  │  ├── config.base.fish     # common fish config
+│  │  ├── config.user.fish     # user fish config
+|  │  └── config.secret.fish   #  place for API tokens, secrets... etc
+```
+
+Just like what we did in our home.nix file, we just need to update each custom config files to
+add conditional file import.
+
+For this to work, we are going to a few lines into .bashrc, .zshrc, and config.base.fish as following:
+
+.bashrc
+
+```sh
+# DO NOT MODIFY this file unless, the change is required
+# for all memebers.
+#
+# This file provide set of common bash configurations
+# that are useful for all of us.
+
+# set up PATH
+export PATH=$PATH:$HOME/.config/bin
+
+if [ -f $HOME/.config/bash/user.bash ]; then
+	source $HOME/.config/bash/user.bash
+fi
+
+if [ -f $HOME/.config/bash/secret.bash ]; then
+	source $HOME/.config/bash/secret.bash
+fi
+```
+
+.zshrc
+
+```sh
+# DO NOT MODIFY this file unless, the change is required
+# for all memebers.
+#
+# This file provide set of common zsh configurations
+# that are useful for all of us.
+
+# region: setup
+# TODO:: add more configs
+# endregion 
+
+if [ -f $HOME/.config/zsh/user.zsh ]; then
+  source $HOME/.config/zsh/user.zsh
+fi
+
+if [ -f $HOME/.config/zsh/secret.zsh ]; then
+  source $HOME/.config/zsh/secret.zsh
+fi
+```
+
+config.base.fish
+
+```fish
+# DO NOT MODIFY this file unless, the change is required
+# for all memebers.
+#
+# This file provide set of common fish configurations
+# that are useful for all of us.
+
+# region: setup
+# TODO:: add more configs
+# endregion 
+
+if test -f $HOME/.config/fish/config.user.fish
+  source $HOME/.config/fish/config.user.fish
+end
+
+if test -f $HOME/.config/fish/config.secret.fish
+  source $HOME/.config/fish/config.secret.fish
+end
+```
+
+Now, we are ready test these new structure. For a demonstration, let's add a custom zsh configuration
+
+```sh
+cat <<EOF > ~/.config/zsh/user.zsh
+echo "My Custom config"
+EOF
+
+zsh # loading a new zsh session
+```
+
+And you should see that our zsh session prints out 
+
+```
+My Custom config
+```
+
+## Conclusion
+
+By supplying a further hierarchy of configurations, we have successfully created a nix set up that can
+be used to supply common configurations for everyone in an organization, while providing an ability for
+each users to customize their own environment. 
+
+`provided-pkgs.nix` file is used to provide common packages that we would like to distribute to everyone
+in a team, while `home.user.nix` can be used to provide further customization for an end user.
+
+Similarly, common shell configurations can be managed by `~/.config/bash/.bashrc`, `~/.config/zsh/.zshrc`, and 
+`~/.config/fish/config.base.fish`, while `~/.config/bash/user.bash`, `~/.config/zsh/user.zsh`, and 
+`~/.config/fish/config.user.fish` provide place for further customization for an end user, without needing to
+set up above shell environment using nix.

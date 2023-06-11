@@ -11,7 +11,7 @@ draft: false
 
 ## Goal
 
-In this post, we will set up nix and home-manager configuration that can be used in any developement machine.
+In this post, we will set up nix and home-manager configuration that can be used in any development machine.
 At the end, I would like to achieve following goals:
 
 1. Nix and Home Manager setup that can be easily trasnferred into different machines.
@@ -33,17 +33,17 @@ I won't go too much detail on each installation options. I chose its recommended
 In order for the setup to be (somewhat) universal, I need way to share my configurations between different machines.
 For that, we are going to track and share dotfiles with git.
 
-There are numerous articles explaning on how we can achieve this. My setup is particularly inspried by two articles:
+There are numerous articles explaning on how we can achieve this. My setup is particularly inspired by two articles:
 
 * https://drewdevault.com/2019/12/30/dotfiles.html
 * https://www.atlassian.com/git/tutorials/dotfiles
 
-In summary, our dotfiles git repository will have following chracterestics:
+In summary, our dotfiles git repository will have following characteristics:
 
 1. All files will be ignored with .gitignore to prevent accidental commit on sensitive information
 2. Git directory will be placed different from its work tree. This prevents nix's flake honoring gitignore file.
 
-Detailed instructions how how to set up this dotfiles repository will be convered on a different post.
+Detailed instructions how to set up this dotfiles repository will be covered on a different post.
 
 For now, consider that we are going to work on `$HOME/.config` directory
 
